@@ -2,11 +2,12 @@
 import scrapy
 import re
 from copy import deepcopy
+import json
 
 
 class JdSpider(scrapy.Spider):
     name = 'jd'
-    allowed_domains = ['jd.com']
+    allowed_domains = ['jd.com', 'p.3.cn']
     start_urls = ['https://e.jd.com/']
 
     def parse(self, response):
@@ -36,13 +37,19 @@ class JdSpider(scrapy.Spider):
         book_list = response.xpath('//ul[@class="gl-warp clearfix"]/li')
         # print('book', book_list)
         for book in book_list:
+            item['book_detail_url'] = 'https:' + book.xpath('//div[@class="p-name"]/a/@href').extract_first()
             item['book_img'] = book.xpath('.//div[@class="p-img"]/a/@href').extract_first()
-            item['book_price'] = book.xpath('.//div[@class="p-price"]/strong[1]/i/text()').extract_first()
             item['book_name'] = book.xpath('.//div[@class="p-name"]/a/em/text()').extract_first()
             item['book_author'] = book.xpath('.//span[@class="author_type_1"]/a/text()').extract_first()
             item['book_store'] = book.xpath('.//span[@class="p-bi-store"]/a/text()').extract_first()
             item['book_date'] = book.xpath('.//span[@class="p-bi-date"]/text()').extract_first()
-            print(item)
+            item['data-sku'] = book.xpath('./div[@class="gl-i-wrap j-sku-item"]/@data-sku').extract_first()
+
+            yield scrapy.Request(
+                'https://p.3.cn/prices/mgets?skuIds=J_{}'.format(item['data-sku']),
+                callback=self.parse_price,
+                meta={'item': deepcopy(item)}
+            )
 
         next_page = response.xpath('//a[@class="pn-next"]/@href').extract_first()
         if next_page is not None:
@@ -51,3 +58,8 @@ class JdSpider(scrapy.Spider):
                 callback=self.parse_list,
                 meta={'item': response.meta['item']}
             )
+
+    def parse_price(self, response):
+        item = response.meta['item']
+        item['book_price'] = json.loads(response.body.decode())[0]['op']
+        print(item)
