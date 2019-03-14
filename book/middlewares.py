@@ -6,6 +6,21 @@
 # https://doc.scrapy.org/en/latest/topics/spider-middleware.html
 
 from scrapy import signals
+import random
+
+
+class RandomUserAgentMiddleware(object):
+    def __init__(self, uas):
+        self.uas = uas
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(
+            uas=crawler.settings.get('USER_AGENT_LIST')
+        )
+
+    def process_request(self, request, spider):
+        request.headers.setdefault('User-Agent', random.choice(self.uas))
 
 
 class BookSpiderMiddleware(object):
